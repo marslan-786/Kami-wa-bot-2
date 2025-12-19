@@ -10,7 +10,8 @@ RUN go build -o bot .
 FROM alpine:latest
 RUN apk add --no-cache sqlite-libs ca-certificates
 WORKDIR /app
+# ڈیٹا کے لیے فولڈر بنانا
+RUN mkdir -p /app/data
 COPY --from=builder /app/bot .
-# ڈیٹا بیس محفوظ رکھنے کے لیے
-VOLUME /app/data
+# اب یہاں VOLUME کی کمانڈ نہیں ہے، یہ ریلوے ڈیش بورڈ سے ہوگا
 CMD ["./bot"]

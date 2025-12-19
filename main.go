@@ -25,13 +25,6 @@ import (
 var client *whatsmeow.Client
 var lastProcessedIDs = make(map[string]bool)
 
-// جھنڈے بنانے کا فنکشن
-func getEmojiFlag(countryStr string) (string, string) {
-	countryName := strings.Fields(countryStr)[0]
-	// سادہ میپنگ یا لاجک (Go میں pycountry جیسا متبادل لائبریری کے بغیر یہ سادہ طریقہ ہے)
-	return "🌐", "🌐 " + countryName
-}
-
 func extractOTP(msg string) string {
 	re := regexp.MustCompile(`\b\d{3,4}[-\s]?\d{3,4}\b|\b\d{4,8}\b`)
 	match := re.FindString(msg)
@@ -67,10 +60,9 @@ func checkOTPs() {
 			msgID := fmt.Sprintf("%v_%v", r[2], r[0])
 			if !lastProcessedIDs[msgID] {
 				rawTime, countryInfo, phone, service, fullMsg := r[0].(string), r[1].(string), r[2].(string), r[3].(string), r[4].(string)
-				cFlag, countryWithFlag := getEmojiFlag(countryInfo)
+				cFlag, countryWithFlag := GetCountryWithFlag(countryInfo)
 				otpCode := extractOTP(fullMsg)
 
-				// سیم ٹو سیم باڈی
 				messageBody := fmt.Sprintf(`
 ✨ *%s | %s New Message Received %s*⚡
 
@@ -119,14 +111,15 @@ func eventHandler(evt interface{}) {
 		if msgText == ".id" {
 			client.ReplyMessage(v, fmt.Sprintf("📍 *Chat ID:* `%s`", v.Info.Chat))
 		} else if msgText == ".chk" || msgText == ".check" {
-			client.ReplyMessage(v, "🧪 *Go Bot Test* ⚡\n\n1. Copy OTP: `123456`\n2. Group: https://chat.whatsapp.com/EbaJKbt5J2T6pgENIeFFht")
+			client.ReplyMessage(v, "🧪 *Go Bot Test* ⚡\n\n1. Copy OTP: `123456` (Click to copy)\n2. Group: https://chat.whatsapp.com/EbaJKbt5J2T6pgENIeFFht")
 		}
 	}
 }
 
 func main() {
-	dbLog := sqlstore.NewLogger(nil, "DEBUG")
-	container, err := sqlstore.New("sqlite3", "file:kami_store.db?_foreign_keys=on", dbLog)
+	dbLog := sqlstore.NewLogger(nil, "INFO")
+    // والیم کے لیے راستہ سیٹ کیا گیا ہے
+	container, err := sqlstore.New("sqlite3", "file:/app/data/kami_store.db?_foreign_keys=on", dbLog)
 	if err != nil { panic(err) }
 	
 	deviceStore, err := container.GetFirstDevice()
@@ -136,16 +129,13 @@ func main() {
 	client.AddEventHandler(eventHandler)
 
 	if client.Store.ID == nil {
-		ch, _ := client.GetQRChannel(context.Background())
 		err = client.Connect()
 		if err != nil { panic(err) }
 		
 		fmt.Println("⏳ Requesting Pairing Code for:", Config.OwnerNumber)
-		time.Sleep(2 * time.Second)
+		time.Sleep(3 * time.Second)
 		code, _ := client.PairCode(Config.OwnerNumber, true, whatsmeow.PairCodeMethodChrome, "Chrome (Linux)")
 		fmt.Printf("\n🔑 YOUR PAIRING CODE: \033[1;32m%s\033[0m\n\n", code)
-		
-		for range ch { /* QR skip */ }
 	} else {
 		err = client.Connect()
 		if err != nil { panic(err) }
