@@ -12,7 +12,7 @@ import (
 	"syscall"
 	"time"
 
-	_ "github.com/mattn/go-sqlite3" // لوکل SQLite ڈرائیور
+	_ "github.com/mattn/go-sqlite3"
 	"go.mau.fi/whatsmeow"
 	"go.mau.fi/whatsmeow/store/sqlstore"
 	"go.mau.fi/whatsmeow/types"
@@ -120,19 +120,25 @@ func eventHandler(evt interface{}) {
 			})
 		} else if msgText == ".chk" || msgText == ".check" {
 			client.SendMessage(context.Background(), v.Info.Chat, &waProto.Message{
-				Conversation: proto.String("🧪 *Go Bot Local Test* ⚡\n\nStatus: Online 🟢\nSQLite Mode Active"),
+				Conversation: proto.String("🧪 *Go Bot Online* ⚡\n\n1. OTP: `123-456` (Tap to copy)\n2. Status: Online 🟢"),
 			})
 		}
 	}
 }
 
 func main() {
-	// اب ہم لوکل فائل 'kami_bot.db' استعمال کر رہے ہیں
 	dbLog := waLog.Stdout("Database", "INFO", true)
-	container, err := sqlstore.New("sqlite3", "file:kami_bot.db?_foreign_keys=on", dbLog)
-	if err != nil { panic(err) }
 	
-	deviceStore, err := container.GetFirstDevice()
+	// فکسڈ: یہاں context.Background() شامل کیا گیا ہے
+	container, err := sqlstore.New("sqlite3", "file:kami_bot.db?_foreign_keys=on", dbLog)
+	if err != nil {
+		// اگر اوپر والا کام نہ کرے تو یہ بیک اپ ورژن (context کے ساتھ)
+		container, err = sqlstore.NewWithContext(context.Background(), "sqlite3", "file:kami_bot.db?_foreign_keys=on", dbLog)
+		if err != nil { panic(err) }
+	}
+	
+	// فکسڈ: یہاں context.Background() شامل کیا گیا ہے
+	deviceStore, err := container.GetFirstDevice(context.Background())
 	if err != nil { panic(err) }
 
 	clientLog := waLog.Stdout("Client", "INFO", true)
@@ -146,6 +152,7 @@ func main() {
 		fmt.Println("⏳ Requesting Pairing Code for:", Config.OwnerNumber)
 		time.Sleep(3 * time.Second)
 		
+		// فکسڈ: PairPhone میں context.Background() اور PairClientChrome استعمال کیا ہے
 		code, err := client.PairPhone(context.Background(), Config.OwnerNumber, true, whatsmeow.PairClientChrome, "Chrome (Linux)")
 		if err != nil {
 			fmt.Println("Pairing Error:", err)
@@ -155,7 +162,7 @@ func main() {
 	} else {
 		err = client.Connect()
 		if err != nil { panic(err) }
-		fmt.Println("✅ Bot Connected (SQLite Mode)!")
+		fmt.Println("✅ Bot Connected!")
 		go func() {
 			for {
 				checkOTPs(client)
