@@ -37,11 +37,9 @@ func initMongoDB() {
 	defer cancel()
 	mClient, err := mongo.Connect(ctx, options.Client().ApplyURI(uri))
 	if err != nil {
-		fmt.Println("❌ [MongoDB] Connection Failed!")
 		panic(err)
 	}
 	mongoColl = mClient.Database("kami_otp_db").Collection("sent_otps")
-	fmt.Println("✅ [DB] MongoDB Connected for History")
 }
 
 func isAlreadySent(id string) bool {
@@ -58,67 +56,42 @@ func markAsSent(id string) {
 	_, _ = mongoColl.InsertOne(ctx, bson.M{"msg_id": id, "at": time.Now()})
 }
 
-// --- مددگار فنکشنز (فکسڈ) ---
+// --- مددگار فنکشنز ---
 func extractOTP(msg string) string {
 	re := regexp.MustCompile(`\b\d{3,4}[-\s]?\d{3,4}\b|\b\d{4,8}\b`)
 	return re.FindString(msg)
 }
 
-func maskNumber(num string) string {
-	if len(num) < 7 {
-		return num
-	}
-	return num[:5] + "XXXX" + num[len(num)-2:]
-}
-
 func cleanCountryName(name string) string {
-	if name == "" {
-		return "Unknown"
-	}
-	firstPart := strings.Split(name, "-")[0]
-	words := strings.Fields(firstPart)
-	if len(words) > 0 {
-		return words[0]
-	}
+	if name == "" { return "Unknown" }
+	// پہلا لفظ اٹھانا
+	parts := strings.Fields(strings.Split(name, "-")[0])
+	if len(parts) > 0 { return parts[0] }
 	return "Unknown"
 }
 
-// --- Monitoring Logic ---
+// --- مین مانیٹرنگ لوپ ---
 func checkOTPs(cli *whatsmeow.Client) {
 	for i, url := range Config.OTPApiURLs {
 		apiIdx := i + 1
-		httpClient := &http.Client{Timeout: 8 * time.Second}
+		httpClient := &http.Client{Timeout: 10 * time.Second}
 		resp, err := httpClient.Get(url)
-		if err != nil {
-			fmt.Printf("⚠️ [API SKIP] API %d unreachable\n", apiIdx)
-			continue
-		}
-
+		if err != nil { continue }
+		
 		var data map[string]interface{}
 		json.NewDecoder(resp.Body).Decode(&data)
 		resp.Body.Close()
-		if data == nil || data["aaData"] == nil {
-			continue
-		}
+		if data == nil || data["aaData"] == nil { continue }
 
-		aaData, ok := data["aaData"].([]interface{})
-		if !ok || len(aaData) == 0 {
-			continue
-		}
+		aaData := data["aaData"].([]interface{})
+		if len(aaData) == 0 { continue }
 
-		apiName := "API-Server"
-		if strings.Contains(url, "kamibroken") {
-			apiName = "Kami-Broken"
-		}
-
+		// فرسٹ رن: صرف خاموشی سے ڈیٹا بیس اپڈیٹ کریں
 		if isFirstRun {
-			fmt.Printf("🚀 [First Run] Syncing %d records from API %d\n", len(aaData), apiIdx)
 			for _, row := range aaData {
 				r := row.([]interface{})
 				msgID := fmt.Sprintf("%v_%v", r[2], r[0])
-				if !isAlreadySent(msgID) {
-					markAsSent(msgID)
-				}
+				if !isAlreadySent(msgID) { markAsSent(msgID) }
 			}
 			isFirstRun = false
 			return
@@ -126,48 +99,42 @@ func checkOTPs(cli *whatsmeow.Client) {
 
 		for _, row := range aaData {
 			r, ok := row.([]interface{})
-			if !ok || len(r) < 5 {
-				continue
-			}
+			if !ok || len(r) < 5 { continue }
 
-			msgID := fmt.Sprintf("%v_%v", r[2], r[0])
+			// ڈیٹا کو محفوظ طریقے سے نکالنا (Sprints v% use karkay)
+			rawTime := fmt.Sprintf("%v", r[0])
+			countryRaw := fmt.Sprintf("%v", r[1])
+			phone := fmt.Sprintf("%v", r[2])
+			service := fmt.Sprintf("%v", r[3])
+			fullMsg := fmt.Sprintf("%v", r[4])
+
+			if phone == "0" || phone == "" { continue }
+
+			msgID := fmt.Sprintf("%v_%v", phone, rawTime)
+
 			if !isAlreadySent(msgID) {
-				rawTime, _ := r[0].(string)
-				countryRaw, _ := r[1].(string)
-				phone, _ := r[2].(string)
-				service, _ := r[3].(string)
-				fullMsg, _ := r[4].(string)
-
 				cleanCountry := cleanCountryName(countryRaw)
 				cFlag, _ := GetCountryWithFlag(cleanCountry)
 				otpCode := extractOTP(fullMsg)
+				
+				// لائن بریکس ختم کرنا
 				flatMsg := strings.ReplaceAll(strings.ReplaceAll(fullMsg, "\n", " "), "\r", "")
 
-				// باڈی کو آپ کے ڈیزائن کے مطابق بنانے کے لیے بیک ٹِک متغیر
-				bt := "`"
-				messageBody := fmt.Sprintf("✨ *%s | %s Message %d*⚡\n"+
-					"> ⏰ %sTime%s ~ _%s_\n"+
-					"> 🌍 %sCountry%s • _%s_\n"+
-					"  📞 %sNumber%s √ _%s_\n"+
-					"> ⚙️ %sService%s + _%s_\n"+
-					"  🔑 %sOTP%s ✓ *%s*\n"+
-					"> 📡 %sAPI%s × *%s*\n"+
-					"> 📞 %sjoin for numbers%s\n"+
+				// سادہ اور بولڈ باڈی (صرف آپ کے لنکس کے ساتھ)
+				messageBody := fmt.Sprintf("✨ *%s | %s Message %d* ⚡\n\n"+
+					"> *Time:* %s\n"+
+					"> *Country:* %s %s\n"+
+					"> *Number:* %s\n"+
+					"> *Service:* %s\n"+
+					"> *OTP:* %s\n\n"+
+					"> *Join For Numbers:* \n"+
 					"> https://chat.whatsapp.com/EbaJKbt5J2T6pgENIeFFht\n"+
-					"> https://chat.whatsapp.com/L0Qk2ifxRFU3fduGA45osD\n"+
-					"📩 %sFull Msg%s\n"+
-					"> %s%s%s\n\n"+
-					"> Developed by Nothing Is Impossible",
+					"> https://chat.whatsapp.com/L0Qk2ifxRFU3fduGA45osD\n\n"+
+					"*Full Message:*\n"+
+					"%s\n\n"+
+					"> © Developed by Nothing Is Impossible",
 					cFlag, strings.ToUpper(service), apiIdx,
-					bt, bt, rawTime,
-					bt, bt, cFlag+" "+cleanCountry,
-					bt, bt, maskNumber(phone),
-					bt, bt, service,
-					bt, bt, otpCode,
-					bt, bt, apiName,
-					bt, bt,
-					bt, bt,
-					bt, flatMsg, bt)
+					rawTime, cFlag, cleanCountry, phone, service, otpCode, flatMsg)
 
 				for _, jidStr := range Config.OTPChannelIDs {
 					jid, _ := types.ParseJID(jidStr)
@@ -177,46 +144,35 @@ func checkOTPs(cli *whatsmeow.Client) {
 					time.Sleep(2 * time.Second)
 				}
 				markAsSent(msgID)
-				fmt.Printf("✅ [Sent] API %d OTP for %s\n", apiIdx, phone)
+				fmt.Printf("✅ [Sent] API %d: %s\n", apiIdx, phone)
 			}
 		}
 	}
 }
 
 func main() {
-	fmt.Println("🚀 [Boot] Starting Kami OTP Bot...")
+	fmt.Println("🚀 [Init] Starting Kami Bot...")
 	initMongoDB()
 
 	dbURL := os.Getenv("DATABASE_URL")
 	dbType := "postgres"
-
 	if dbURL == "" {
-		fmt.Println("ℹ️ No DATABASE_URL, using local SQLite")
 		dbURL = "file:kami_session.db?_foreign_keys=on"
 		dbType = "sqlite3"
 	}
 
 	dbLog := waLog.Stdout("Database", "INFO", true)
 	container, err := sqlstore.New(context.Background(), dbType, dbURL, dbLog)
-	if err != nil {
-		fmt.Printf("❌ [DB Error] Failed: %v\n", err)
-		return
-	}
-
+	if err != nil { panic(err) }
+	
 	deviceStore, err := container.GetFirstDevice(context.Background())
-	if err != nil {
-		panic(err)
-	}
+	if err != nil { panic(err) }
 
 	client = whatsmeow.NewClient(deviceStore, waLog.Stdout("Client", "INFO", true))
-	
-	// خالی ایونٹ ہینڈلر تاکہ کریش نہ ہو
 	client.AddEventHandler(func(evt interface{}) {})
 
 	err = client.Connect()
-	if err != nil {
-		panic(err)
-	}
+	if err != nil { panic(err) }
 
 	if client.Store.ID == nil {
 		code, _ := client.PairPhone(context.Background(), Config.OwnerNumber, true, whatsmeow.PairClientChrome, "Chrome (Linux)")
@@ -225,10 +181,8 @@ func main() {
 
 	go func() {
 		for {
-			if client.IsLoggedIn() {
-				checkOTPs(client)
-			}
-			time.Sleep(3 * time.Second)
+			if client.IsLoggedIn() { checkOTPs(client) }
+			time.Sleep(5 * time.Second)
 		}
 	}()
 
