@@ -14,8 +14,9 @@ var Config = struct {
 		"120363421646654726@newsletter",
 	},
 	OTPApiURLs: []string{
-		"https://web-production-b717.up.railway.app/api?type=sms",
+		"https://www.kamibroken.pw/api/sms?type=sms",
 		"https://www.kamibroken.pw/api/sms1?type=sms",
+		"https://www.kamibroken.pw/api/sms3?type=sms",
 	},
-	Interval: 15, // سیکنڈز
+	Interval: 3, // سیکنڈز
 }

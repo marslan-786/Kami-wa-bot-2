@@ -4,7 +4,7 @@ RUN apk add --no-cache gcc musl-dev git sqlite-dev
 WORKDIR /app
 COPY . .
 
-# مکمل صفائی اور تازہ ترین لائبریریز کا حصول
+# مکمل صفائی اور ری-انیشلائزیشن
 RUN rm -f go.mod go.sum || true
 RUN go mod init otp-bot
 RUN go get go.mau.fi/whatsmeow@latest
