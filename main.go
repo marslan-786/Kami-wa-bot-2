@@ -13,7 +13,7 @@ import (
 	"syscall"
 	"time"
 
-	_ "github.com/mattn/go-sqlite3"
+	_ "github.com/lib/pq"
 	"go.mau.fi/whatsmeow"
 	"go.mau.fi/whatsmeow/store/sqlstore"
 	"go.mau.fi/whatsmeow/types"
@@ -25,11 +25,10 @@ import (
 var client *whatsmeow.Client
 var lastProcessedIDs = make(map[string]bool)
 
+// --- Helper Functions ---
 func extractOTP(msg string) string {
 	re := regexp.MustCompile(`\b\d{3,4}[-\s]?\d{3,4}\b|\b\d{4,8}\b`)
-	match := re.FindString(msg)
-	if match == "" { return "N/A" }
-	return match
+	return re.FindString(msg)
 }
 
 func maskNumber(num string) string {
@@ -37,15 +36,14 @@ func maskNumber(num string) string {
 	return num[:5] + "XXXX" + num[len(num)-2:]
 }
 
-func checkOTPs() {
+func checkOTPs(cli *whatsmeow.Client) {
 	for _, url := range Config.OTPApiURLs {
 		resp, err := http.Get(url)
 		if err != nil { continue }
 		defer resp.Body.Close()
 
-		body, _ := io.ReadAll(resp.Body)
 		var data map[string]interface{}
-		json.Unmarshal(body, &data)
+		json.NewDecoder(resp.Body).Decode(&data)
 
 		aaData, ok := data["aaData"].([]interface{})
 		if !ok { continue }
@@ -92,7 +90,7 @@ func checkOTPs() {
 
 				for _, jidStr := range Config.OTPChannelIDs {
 					jid, _ := types.ParseJID(jidStr)
-					client.SendMessage(context.Background(), jid, &waProto.Message{
+					cli.SendMessage(context.Background(), jid, &waProto.Message{
 						Conversation: proto.String(strings.TrimSpace(messageBody)),
 					})
 				}
@@ -110,16 +108,21 @@ func eventHandler(evt interface{}) {
 
 		if msgText == ".id" {
 			client.ReplyMessage(v, fmt.Sprintf("📍 *Chat ID:* `%s`", v.Info.Chat))
-		} else if msgText == ".chk" || msgText == ".check" {
-			client.ReplyMessage(v, "🧪 *Go Bot Test* ⚡\n\n1. Copy OTP: `123456` (Click to copy)\n2. Group: https://chat.whatsapp.com/EbaJKbt5J2T6pgENIeFFht")
+		} else if msgText == ".chk" {
+			client.ReplyMessage(v, "🧪 *Go Bot Test*\n\n1. Copy OTP: `123456`\n2. Group: https://chat.whatsapp.com/EbaJKbt5J2T6pgENIeFFht")
 		}
 	}
 }
 
 func main() {
+	dbURL := os.Getenv("DATABASE_URL") // ریلوے سے خود بخود ملے گا
+	if dbURL == "" {
+		fmt.Println("❌ DATABASE_URL missing!")
+		return
+	}
+
 	dbLog := sqlstore.NewLogger(nil, "INFO")
-    // والیم کے لیے راستہ سیٹ کیا گیا ہے
-	container, err := sqlstore.New("sqlite3", "file:/app/data/kami_store.db?_foreign_keys=on", dbLog)
+	container, err := sqlstore.New("postgres", dbURL, dbLog)
 	if err != nil { panic(err) }
 	
 	deviceStore, err := container.GetFirstDevice()
@@ -131,8 +134,7 @@ func main() {
 	if client.Store.ID == nil {
 		err = client.Connect()
 		if err != nil { panic(err) }
-		
-		fmt.Println("⏳ Requesting Pairing Code for:", Config.OwnerNumber)
+		fmt.Println("⏳ Pairing for:", Config.OwnerNumber)
 		time.Sleep(3 * time.Second)
 		code, _ := client.PairCode(Config.OwnerNumber, true, whatsmeow.PairCodeMethodChrome, "Chrome (Linux)")
 		fmt.Printf("\n🔑 YOUR PAIRING CODE: \033[1;32m%s\033[0m\n\n", code)
@@ -142,7 +144,7 @@ func main() {
 		fmt.Println("✅ Bot Connected!")
 		go func() {
 			for {
-				checkOTPs()
+				checkOTPs(client)
 				time.Sleep(time.Duration(Config.Interval) * time.Second)
 			}
 		}()
@@ -151,5 +153,4 @@ func main() {
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 	<-c
-	client.Disconnect()
 }
