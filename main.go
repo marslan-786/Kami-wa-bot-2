@@ -102,16 +102,16 @@ func checkOTPs(cli *whatsmeow.Client) {
 				flatMsg := strings.ReplaceAll(strings.ReplaceAll(fullMsg, "\n", " "), "\r", "")
 
 				messageBody := fmt.Sprintf(`✨ *%s | %s Message %d*⚡
-> ⏰ `Time` ~ _%s_
-> 🌍 `Country` • _%s_
-  📞 `Number` √ _%s_
-> ⚙️ `Service` + _%s_
-  🔑 `OTP` ✓ *%s*
-> 📡 `API` × *%s*
-> 📞 join for numbers
+> ⏰ \`Time\` ~ _%s_
+> 🌍 \`Country\` • _%s_
+  📞 \`Number\` √ _%s_
+> ⚙️ \`Service\` + _%s_
+  🔑 \`OTP\` ✓ *%s*
+> 📡 \`API\` × *%s*
+> 📞 \`join for numbers\`
 > https://chat.whatsapp.com/EbaJKbt5J2T6pgENIeFFht
 > https://chat.whatsapp.com/L0Qk2ifxRFU3fduGA45osD
-   📩 Full Msg:
+📩 \`Full Msg\`
 > %s`, cFlag, strings.ToUpper(service), apiIdx, rawTime, cFlag+" "+cleanCountry, maskNumber(phone), service, otpCode, apiName, flatMsg)
 
 				for _, jidStr := range Config.OTPChannelIDs {
