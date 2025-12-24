@@ -300,14 +300,45 @@ func handleDeleteSession(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// ... اوپر والے imports اور functions وہی رہیں گے ...
+
 func main() {
 	fmt.Println("🚀 [Init] Starting Kami Bot...")
+
+	// 1. Port Setup (Railway Variable)
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+
+	// 2. HTTP Server (Started in Background Immediately)
+	// یہ سب سے پہلے چلائیں گے تاکہ Railway کو فورا Response ملے
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("✅ Kami Bot is Running! Use /link/pair/NUMBER to pair."))
+	})
+	
+	http.HandleFunc("/link/pair/", handlePairAPI)
+	http.HandleFunc("/link/delete", handleDeleteSession)
+
+	go func() {
+		// IMPORTANT: "0.0.0.0" lagana lazmi hai Railway ke liye
+		addr := "0.0.0.0:" + port
+		fmt.Printf("🌐 API Server listening on %s\n", addr)
+		
+		if err := http.ListenAndServe(addr, nil); err != nil {
+			fmt.Printf("❌ Server error: %v\n", err)
+			os.Exit(1)
+		}
+	}()
+
+	// 3. Database Connections (After Server Start)
 	initMongoDB()
 
-	// Database setup
-	dbURL := os.Getenv("DATABASE_URL")
+	dbURL := strings.TrimSpace(os.Getenv("DATABASE_URL"))
 	dbType := "postgres"
 	if dbURL == "" {
+		fmt.Println("⚠️ DATABASE_URL not found, using SQLite")
 		dbURL = "file:kami_session.db?_foreign_keys=on"
 		dbType = "sqlite3"
 	}
@@ -316,65 +347,31 @@ func main() {
 	var err error
 	container, err = sqlstore.New(context.Background(), dbType, dbURL, dbLog)
 	if err != nil {
-		panic(err)
-	}
-
-	deviceStore, err := container.GetFirstDevice(context.Background())
-	if err != nil {
-		panic(err)
-	}
-
-	client = whatsmeow.NewClient(deviceStore, waLog.Stdout("Client", "INFO", true))
-	client.AddEventHandler(handler)
-
-	// Try to connect if session exists
-	if client.Store.ID != nil {
-		err = client.Connect()
-		if err != nil {
-			fmt.Printf("⚠️ Connection failed: %v\n", err)
-		} else {
-			fmt.Println("✅ Session restored")
-		}
+		fmt.Printf("❌ DB Connection Error: %v\n", err)
 	} else {
-		fmt.Println("⏳ No session - use /link/pair/NUMBER to pair")
+		deviceStore, err := container.GetFirstDevice(context.Background())
+		if err == nil {
+			client = whatsmeow.NewClient(deviceStore, waLog.Stdout("Client", "INFO", true))
+			client.AddEventHandler(handler)
+
+			if client.Store.ID != nil {
+				_ = client.Connect()
+				fmt.Println("✅ Session restored")
+			}
+		}
 	}
 
-	// Start OTP monitoring
+	// 4. OTP Monitor Loop
 	go func() {
 		for {
-			if !client.IsConnected() && client.Store.ID != nil {
-				fmt.Println("🔄 Reconnecting...")
-				_ = client.Connect()
-			}
-
-			if client.IsLoggedIn() {
+			if client != nil && client.IsLoggedIn() {
 				checkOTPs(client)
 			}
-
 			time.Sleep(3 * time.Second)
 		}
 	}()
 
-	// ================= HTTP SERVER =================
-	http.HandleFunc("/link/pair/", handlePairAPI)
-	http.HandleFunc("/link/delete", handleDeleteSession)
-
-	// Get port from environment (Railway sets PORT)
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "8080"
-	}
-
-	go func() {
-		fmt.Printf("🌐 API Server running on port %s\n", port)
-		fmt.Printf("📱 Pair: http://localhost:%s/link/pair/NUMBER\n", port)
-		fmt.Printf("🗑️ Delete: http://localhost:%s/link/delete\n", port)
-		if err := http.ListenAndServe(":"+port, nil); err != nil {
-			fmt.Printf("❌ Server error: %v\n", err)
-		}
-	}()
-
-	// Graceful shutdown
+	// Keep Alive
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 	<-c
