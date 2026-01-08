@@ -34,6 +34,7 @@ var flagMap = map[string]string{
 	"bulgaria": "🇧🇬",
 	"burkina faso": "🇧🇫",
 	"burundi": "🇧🇮",
+	"bulgarian": "🇧🇬",
 
 	"cambodia": "🇰🇭",
 	"cameroon": "🇨🇲",
@@ -103,6 +104,7 @@ var flagMap = map[string]string{
 	"kiribati": "🇰🇮",
 	"kuwait": "🇰🇼",
 	"kyrgyzstan": "🇰🇬",
+	"kosovo": "🇽🇰",
 
 	"laos": "🇱🇦",
 	"latvia": "🇱🇻",
@@ -145,6 +147,7 @@ var flagMap = map[string]string{
 	"philippines": "🇵🇭",
 	"poland": "🇵🇱",
 	"portugal": "🇵🇹",
+	"palestine": "🇵🇸",
 
 	"qatar": "🇶🇦",
 
@@ -167,6 +170,7 @@ var flagMap = map[string]string{
 	"sweden": "🇸🇪",
 	"switzerland": "🇨🇭",
 	"syria": "🇸🇾",
+	"sierra": "🇸🇱",
 
 	"taiwan": "🇹🇼",
 	"tajikistan": "🇹🇯",
