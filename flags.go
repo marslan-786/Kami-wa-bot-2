@@ -201,7 +201,7 @@ func GetCountryWithFlag(countryName string) (string, string) {
 	cleanName := strings.ToLower(strings.Fields(countryName)[0])
 	flag, ok := flagMap[cleanName]
 	if !ok {
-		return "🌐", "🌐 " + countryName
+		return "🫣", "🫣 " + countryName
 	}
 	return flag, flag + " " + countryName
 }
