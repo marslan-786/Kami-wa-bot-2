@@ -115,6 +115,7 @@ var flagMap = map[string]string{
 	"liechtenstein": "🇱🇮",
 	"lithuania": "🇱🇹",
 	"luxembourg": "🇱🇺",
+	"lvory": "🇨🇮",
 
 	"madagascar": "🇲🇬",
 	"malawi": "🇲🇼",
