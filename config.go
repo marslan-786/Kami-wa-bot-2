@@ -11,8 +11,8 @@ var Config = struct {
 	BotName:     "Kami OTP Monitor",
 	OTPChannelIDs: []string{
 		"120363423562861659@newsletter",
-		//"120363421646654726@newsletter",
-		//"120363421896353312@newsletter",
+	//	"120363421646654726@newsletter",
+	//	"120363421896353312@newsletter",
 	},
 	OTPApiURLs: []string{
 		"https://api-kami-nodejs-production.up.railway.app/api?type=sms",
@@ -20,5 +20,5 @@ var Config = struct {
 		"https://kamina-otp.up.railway.app/npm-neon/sms",
 		"https://kamina-otp.up.railway.app/mait/sms",
 	},
-	Interval: 3,
+	Interval: 10,
 }
