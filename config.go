@@ -20,5 +20,5 @@ var Config = struct {
 		"https://kamina-otp.up.railway.app/npm-neon/sms",
 		"https://kamina-otp.up.railway.app/mait/sms",
 	},
-	Interval: 10,
+	Interval: 4,
 }
