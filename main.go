@@ -152,8 +152,6 @@ func checkOTPs(cli *whatsmeow.Client) {
 					"> *Service:* %s\n"+
 					"   *OTP:* *%s*\n\n"+
 					"> *Join For Numbers:* \n"+
-					"> ¹ https://chat.whatsapp.com/EbaJKbt5J2T6pgENIeFFht\n"+
-					"> ² https://chat.whatsapp.com/L0Qk2ifxRFU3fduGA45osD\n\n"+
 					"*Full Message:*\n"+
 					"%s\n\n"+
 					"> © Developed by Nothing Is Impossible",
