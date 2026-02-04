@@ -13,7 +13,7 @@ var Config = struct {
 		"120363423661360002@newsletter",
 	},
 	OTPApiURLs: []string{
-		"https://api-node-js-new-production-b09a.up.railway.app/api/sms",
+		"https://api-node-js-new-production-b09a.up.railway.app/api?type=sms",
 	},
 	Interval: 4,
 }
